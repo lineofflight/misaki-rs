@@ -156,8 +156,14 @@ impl G2P {
 
     pub fn with_tagger(lang: Language, tagger: Box<dyn Tagger>) -> Self {
         let mut g2p = Self::new(lang);
-        g2p.tagger = tagger;
+        g2p.set_tagger(tagger);
         g2p
+    }
+
+    /// Replaces the part-of-speech tagger, keeping the fallback, for a
+    /// caller that supplies both.
+    pub fn set_tagger(&mut self, tagger: Box<dyn Tagger>) {
+        self.tagger = tagger;
     }
 
     /// Legacy preprocess shape, kept for API compatibility.
@@ -546,6 +552,14 @@ mod tests {
         let g2p = G2P::with_tagger(Language::EnglishUS, Box::new(TestTagger("JJ")));
         let (_, tokens) = g2p.g2p("live wire").unwrap();
         assert!(tokens.iter().all(|t| t.tag == "JJ"));
+    }
+
+    #[test]
+    fn test_set_tagger_keeps_the_fallback() {
+        let mut g2p = G2P::with_fallback(Language::EnglishUS, Some(Box::new(TestFallback)));
+        g2p.set_tagger(Box::new(TestTagger("NN")));
+        assert_eq!(first_phonemes(&g2p, "preload"), "pɹˈilˌOd");
+        assert_eq!(first_phonemes(&g2p, "qzxwv"), "test-phonemes");
     }
 
     #[test]
