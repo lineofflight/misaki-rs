@@ -555,6 +555,16 @@ mod tests {
     }
 
     #[test]
+    fn test_an_unknown_initialism_is_spelled_whatever_its_tag() {
+        // Python misaki's `lookup` falls back to `get_NNP` for any word it
+        // can't find, not only one tagged NNP.
+        let name = G2P::with_tagger(Language::EnglishUS, Box::new(TestTagger("NNP")));
+        let noun = G2P::with_tagger(Language::EnglishUS, Box::new(TestTagger("NN")));
+        assert_eq!(first_phonemes(&name, "URL"), "jˌuˌɑɹˈɛl");
+        assert_eq!(first_phonemes(&noun, "URL"), "jˌuˌɑɹˈɛl");
+    }
+
+    #[test]
     fn test_set_tagger_keeps_the_fallback() {
         let mut g2p = G2P::with_fallback(Language::EnglishUS, Some(Box::new(TestFallback)));
         g2p.set_tagger(Box::new(TestTagger("NN")));
