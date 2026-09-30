@@ -189,13 +189,12 @@ impl Lexicon {
             );
         }
 
-        // Special NNP handling if not found or no primary stress
+        // Spell as a name if not found, whatever the tag, or if a name has
+        // no primary stress, as Python misaki does
         if ps.is_none() || (is_nnp && !ps.as_ref()?.contains('ˈ')) {
-            if is_nnp {
-                if let Some((nnp_ps, nnp_rating)) = self.get_nnp(&current_word) {
-                    ps = Some(nnp_ps);
-                    rating = nnp_rating;
-                }
+            if let Some((nnp_ps, nnp_rating)) = self.get_nnp(&current_word) {
+                ps = Some(nnp_ps);
+                rating = nnp_rating;
             }
         }
 
