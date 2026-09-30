@@ -5,7 +5,7 @@ use crate::fallback::EspeakFallback;
 use crate::languages::{LanguageRules, english::English};
 use crate::lexicon::Lexicon;
 use thiserror::Error;
-use crate::tagger::PerceptronTagger;
+use crate::tagger::{PerceptronTagger, Tagger};
 use crate::token::MToken;
 use num2words::Num2Words;
 use regex::Regex;
@@ -92,7 +92,7 @@ pub struct G2P {
     pub unk: String,
     subtoken_regex: Regex,
     link_regex: Regex,
-    tagger: PerceptronTagger,
+    tagger: Box<dyn Tagger>,
     rules: Box<dyn LanguageRules>,
     fallback: Option<Box<dyn Fallback>>,
 }
@@ -142,7 +142,7 @@ impl G2P {
             unk: "❓".to_string(),
             subtoken_regex,
             link_regex,
-            tagger: PerceptronTagger::new(weights_json, classes_txt, tags_json),
+            tagger: Box::new(PerceptronTagger::new(weights_json, classes_txt, tags_json)),
             rules,
             fallback,
         }
@@ -151,6 +151,12 @@ impl G2P {
     pub fn with_fallback(lang: Language, fallback: Option<Box<dyn Fallback>>) -> Self {
         let mut g2p = Self::new(lang);
         g2p.fallback = fallback;
+        g2p
+    }
+
+    pub fn with_tagger(lang: Language, tagger: Box<dyn Tagger>) -> Self {
+        let mut g2p = Self::new(lang);
+        g2p.tagger = tagger;
         g2p
     }
 
@@ -280,7 +286,7 @@ impl G2P {
         // Collect words for tagging
         let words_owned: Vec<String> = tokens.iter().map(|tk| tk.text.clone()).collect();
         let words: Vec<&str> = words_owned.iter().map(|s| s.as_str()).collect();
-        let tags = self.tagger.tag(&words);
+        let tags = Tagger::tag(&*self.tagger, &words);
 
         log::debug!(
             "g2p '{}' -> {} tokens, {} tags",
@@ -298,7 +304,7 @@ impl G2P {
 
         // First, set tags
         for (tk, tag) in tokens.iter_mut().zip(tags.iter()) {
-            tk.tag = tag.tag.clone();
+            tk.tag = tag.clone();
         }
 
         // Process in reverse to build context from future tokens
@@ -510,6 +516,44 @@ mod tests {
         let (phonemes, _) = g2p.g2p("Hello, world!").unwrap();
         println!("Phonemes: {}", phonemes);
         assert!(!phonemes.contains("❓"));
+    }
+
+    struct TestTagger(&'static str);
+
+    impl Tagger for TestTagger {
+        fn tag(&self, words: &[&str]) -> Vec<String> {
+            words.iter().map(|_| self.0.to_string()).collect()
+        }
+    }
+
+    fn first_phonemes(g2p: &G2P, text: &str) -> String {
+        let (_, tokens) = g2p.g2p(text).unwrap();
+        tokens[0].phonemes.clone().unwrap()
+    }
+
+    #[test]
+    fn test_with_tagger_tags_reach_the_lexicon() {
+        // `preload` has a NOUN entry that stresses the first syllable.
+        let noun = G2P::with_tagger(Language::EnglishUS, Box::new(TestTagger("NN")));
+        let verb = G2P::with_tagger(Language::EnglishUS, Box::new(TestTagger("VB")));
+
+        assert_eq!(first_phonemes(&noun, "preload"), "pɹˈilˌOd");
+        assert_eq!(first_phonemes(&verb, "preload"), "pɹilˈOd");
+    }
+
+    #[test]
+    fn test_with_tagger_tags_are_on_the_tokens() {
+        let g2p = G2P::with_tagger(Language::EnglishUS, Box::new(TestTagger("JJ")));
+        let (_, tokens) = g2p.g2p("live wire").unwrap();
+        assert!(tokens.iter().all(|t| t.tag == "JJ"));
+    }
+
+    #[test]
+    fn test_default_tagger_is_the_perceptron() {
+        let g2p = G2P::new(Language::EnglishUS);
+        let (_, tokens) = g2p.g2p("Show me the Docker logs.").unwrap();
+        let tags: Vec<&str> = tokens.iter().map(|t| t.tag.as_str()).collect();
+        assert_eq!(&tags[..5], ["NNP", "PRP", "DT", "NNP", "NNS"]);
     }
 
     #[test]

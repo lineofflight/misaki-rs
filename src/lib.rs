@@ -12,5 +12,6 @@ pub use token::MToken;
 pub use lexicon::Lexicon;
 pub use language::Language;
 pub use fallback::Fallback;
+pub use tagger::Tagger;
 #[cfg(feature = "espeak")]
 pub use fallback::EspeakFallback;
