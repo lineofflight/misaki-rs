@@ -67,22 +67,10 @@ impl PerceptronTagger {
         let mut prev2 = "-START2-";
         let mut output = Vec::new();
 
-        let mut context = Vec::new();
-        context.push("-START-");
-        context.push("-START2-");
-        for &token in words {
-            context.push(if token.contains("'-'") && !token.starts_with('-') {
-                "!HYPHEN"
-            } else if token.parse::<usize>().is_ok() && token.len() == 4 {
-                "!YEAR"
-            } else if token.chars().next().map_or(false, |c| c.is_ascii_digit()) {
-                "!DIGITS"
-            } else {
-                token
-            });
-        }
-        context.push("-END-");
-        context.push("-END2-");
+        let mut context = vec!["-START-".to_string(), "-START2-".to_string()];
+        context.extend(words.iter().map(|token| Self::normalize(token)));
+        context.push("-END-".to_string());
+        context.push("-END2-".to_string());
 
         for (i, &token) in words.iter().enumerate() {
             if let Some(tag) = self.tags.get(token) {
@@ -108,7 +96,20 @@ impl PerceptronTagger {
         output
     }
 
-    fn get_features(i: usize, word: &str, context: &[&str], prev: &str, prev2: &str) -> HashMap<String, usize> {
+    /// Normalises a word for the context features, as NLTK's `PerceptronTagger.normalize` does.
+    fn normalize(word: &str) -> String {
+        if word.contains('-') && !word.starts_with('-') {
+            "!HYPHEN".to_string()
+        } else if word.parse::<usize>().is_ok() && word.len() == 4 {
+            "!YEAR".to_string()
+        } else if word.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+            "!DIGITS".to_string()
+        } else {
+            word.to_string()
+        }
+    }
+
+    fn get_features(i: usize, word: &str, context: &[String], prev: &str, prev2: &str) -> HashMap<String, usize> {
         let mut features = HashMap::new();
         features.insert("bias".to_string(), 1);
 
@@ -135,5 +136,43 @@ impl PerceptronTagger {
         features.insert(format!("i-1 suffix {}", i_minus_1_suffix), 1);
 
         features
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tagger() -> PerceptronTagger {
+        PerceptronTagger::new(
+            include_str!("resources/tagger/weights.json"),
+            include_str!("resources/tagger/classes.txt"),
+            include_str!("resources/tagger/tags.json"),
+        )
+    }
+
+    fn tags(words: &[&str]) -> Vec<String> {
+        tagger().tag(words).into_iter().map(|t| t.tag).collect()
+    }
+
+    #[test]
+    fn a_hyphenated_word_normalizes_to_hyphen() {
+        assert_eq!(PerceptronTagger::normalize("well-known"), "!HYPHEN");
+    }
+
+    #[test]
+    fn a_hyphenated_word_is_tagged_from_its_normalized_context() {
+        assert_eq!(tags(&["Copy", "the", "state-of-the-art", "build"])[2], "JJ");
+    }
+
+    #[test]
+    fn a_leading_hyphen_is_not_a_hyphenated_word() {
+        assert_eq!(PerceptronTagger::normalize("-foo-"), "-foo-");
+    }
+
+    #[test]
+    fn digits_normalize_to_year_and_digits() {
+        assert_eq!(PerceptronTagger::normalize("2024"), "!YEAR");
+        assert_eq!(PerceptronTagger::normalize("3rd"), "!DIGITS");
     }
 }
