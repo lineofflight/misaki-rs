@@ -105,7 +105,7 @@ impl PerceptronTagger {
         } else if word.chars().next().map_or(false, |c| c.is_ascii_digit()) {
             "!DIGITS".to_string()
         } else {
-            word.to_string()
+            word.to_lowercase()
         }
     }
 
@@ -153,6 +153,21 @@ mod tests {
 
     fn tags(words: &[&str]) -> Vec<String> {
         tagger().tag(words).into_iter().map(|t| t.tag).collect()
+    }
+
+    #[test]
+    fn a_capitalized_sentence_initial_verb_is_tagged_as_a_verb() {
+        assert_eq!(tags(&["Show", "me", "the", "Docker", "logs"])[0], "VB");
+    }
+
+    #[test]
+    fn a_name_mid_sentence_is_still_a_proper_noun() {
+        assert_eq!(tags(&["Ask", "Michele"])[1], "NNP");
+    }
+
+    #[test]
+    fn other_words_are_lowercased() {
+        assert_eq!(PerceptronTagger::normalize("Insert"), "insert");
     }
 
     #[test]
