@@ -87,6 +87,31 @@ fn parse_link_feature(raw: &str) -> Option<LinkFeature> {
     None
 }
 
+/// The words as the tagger should see them: a sentence's first word lowercased, since a
+/// capital there says nothing about a name. An all-caps word (`JSON`, `I`) is left alone.
+/// A sentence starts at the first word of the text and after a `.`, `!`, `?` or `…` token;
+/// punctuation such as an opening quote does not use it up. This departs from NLTK, which
+/// tags the word as written; spaCy, which Python misaki tags with, reads it as a sentence
+/// start.
+fn tagger_words(words: &[&str]) -> Vec<String> {
+    let mut initial = true;
+    words
+        .iter()
+        .map(|&word| {
+            if word.chars().any(char::is_alphanumeric) {
+                let lowered = initial && word != word.to_uppercase();
+                initial = false;
+                if lowered {
+                    return word.to_lowercase();
+                }
+            } else if matches!(word, "." | "!" | "?" | "…") {
+                initial = true;
+            }
+            word.to_string()
+        })
+        .collect()
+}
+
 pub struct G2P {
     pub lexicon: Lexicon,
     pub unk: String,
@@ -280,7 +305,9 @@ impl G2P {
         // Collect words for tagging
         let words_owned: Vec<String> = tokens.iter().map(|tk| tk.text.clone()).collect();
         let words: Vec<&str> = words_owned.iter().map(|s| s.as_str()).collect();
-        let tags = self.tagger.tag(&words);
+        let tagged_words = tagger_words(&words);
+        let tagged_words: Vec<&str> = tagged_words.iter().map(|s| s.as_str()).collect();
+        let tags = self.tagger.tag(&tagged_words);
 
         log::debug!(
             "g2p '{}' -> {} tokens, {} tags",
@@ -510,6 +537,49 @@ mod tests {
         let (phonemes, _) = g2p.g2p("Hello, world!").unwrap();
         println!("Phonemes: {}", phonemes);
         assert!(!phonemes.contains("❓"));
+    }
+
+    fn first_tag(text: &str) -> String {
+        let g2p = G2P::with_fallback(Language::EnglishUS, None);
+        let (_, tokens) = g2p.g2p(text).unwrap();
+        tokens[0].tag.clone()
+    }
+
+    #[test]
+    fn a_sentence_initial_imperative_is_tagged_as_a_verb() {
+        assert_eq!(first_tag("Insert a row."), "VB");
+        assert_eq!(first_tag("Show me the logs."), "VB");
+    }
+
+    #[test]
+    fn the_word_after_a_sentence_end_is_lowercased_for_the_tagger() {
+        let words = ["Read", "the", "docs", ".", "Insert", "a", "row", "!", "JSON", "and", "I", "and", "Michele"];
+        let seen = tagger_words(&words);
+        assert_eq!(seen[0], "read");
+        assert_eq!(seen[4], "insert");
+        // Not sentence-initial: kept as written.
+        assert_eq!(seen[12], "Michele");
+    }
+
+    #[test]
+    fn an_all_caps_word_stays_as_written_for_the_tagger() {
+        let seen = tagger_words(&["JSON", "is", "fine", ".", "I", "agree"]);
+        assert_eq!(seen[0], "JSON");
+        assert_eq!(seen[4], "I");
+    }
+
+    #[test]
+    fn the_token_keeps_its_case_for_pronunciation() {
+        let g2p = G2P::with_fallback(Language::EnglishUS, None);
+        let (_, tokens) = g2p.g2p("Insert a row.").unwrap();
+        assert_eq!(tokens[0].text, "Insert");
+    }
+
+    #[test]
+    fn a_name_mid_sentence_is_still_a_proper_noun() {
+        let g2p = G2P::with_fallback(Language::EnglishUS, None);
+        let (_, tokens) = g2p.g2p("Send the report to Michele.").unwrap();
+        assert_eq!(tokens[4].tag, "NNP");
     }
 
     #[test]
