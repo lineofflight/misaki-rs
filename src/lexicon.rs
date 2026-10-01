@@ -99,7 +99,7 @@ impl Lexicon {
         Self::entry(&self.golds, word).is_some()
     }
 
-    fn has(&self, word: &str) -> bool {
+    pub(crate) fn has(&self, word: &str) -> bool {
         self.in_gold(word) || Self::entry(&self.silvers, word).is_some()
     }
 
