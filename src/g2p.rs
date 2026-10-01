@@ -226,17 +226,45 @@ impl G2P {
                 let tk = MToken::new(word.to_string(), "NN".to_string(), " ".to_string());
                 tokens.push((tk, word_start..mat.end()));
             } else {
-                for sub in subtokens {
-                    let s = word_start + sub.start();
-                    let e = word_start + sub.end();
-                    let tk =
-                        MToken::new(sub.as_str().to_string(), "NN".to_string(), " ".to_string());
+                let spans: Vec<(usize, usize)> =
+                    subtokens.iter().map(|m| (m.start(), m.end())).collect();
+                let mut i = 0;
+                while i < spans.len() {
+                    let end = self.hyphenated_run(word, &spans, i);
+                    let (s, e) = (word_start + spans[i].0, word_start + spans[end].1);
+                    let tk = MToken::new(text[s..e].to_string(), "NN".to_string(), " ".to_string());
                     tokens.push((tk, s..e));
+                    i = end + 1;
                 }
             }
         }
 
         tokens
+    }
+
+    /// The last of `spans` (subtokens of `word`) in the longest run from
+    /// `start` of letters joined by single hyphens, with no gaps, that the
+    /// lexicon knows as one word: "read-only", "follow-up". `start` itself
+    /// when there is none, so a hyphenated word the lexicon lacks splits as
+    /// before.
+    fn hyphenated_run(&self, word: &str, spans: &[(usize, usize)], start: usize) -> usize {
+        let piece = |k: usize| &word[spans[k].0..spans[k].1];
+        let letters = |k: usize| piece(k).chars().all(char::is_alphabetic);
+        let mut best = start;
+        let mut j = start;
+        while j + 2 < spans.len()
+            && letters(j)
+            && piece(j + 1) == "-"
+            && letters(j + 2)
+            && spans[j].1 == spans[j + 1].0
+            && spans[j + 1].1 == spans[j + 2].0
+        {
+            j += 2;
+            if self.lexicon.has(&word[spans[start].0..spans[j].1]) {
+                best = j;
+            }
+        }
+        best
     }
 
     pub fn g2p(&self, text: &str) -> Result<(String, Vec<MToken>), G2PError> {
@@ -520,6 +548,31 @@ mod tests {
 
         assert_eq!(phonemes.trim(), "test-phonemes");
         assert_eq!(tokens[0].phonemes.as_deref(), Some("test-phonemes"));
+    }
+
+    fn texts(g2p: &G2P, text: &str) -> Vec<String> {
+        g2p.tokenize_with_offsets(text)
+            .into_iter()
+            .map(|(tk, _)| tk.text)
+            .collect()
+    }
+
+    #[test]
+    fn test_a_hyphenated_word_in_the_lexicon_stays_one_token() {
+        let g2p = G2P::new(Language::EnglishUS);
+        assert_eq!(texts(&g2p, "read-only."), ["read-only", "."]);
+        assert_eq!(texts(&g2p, "a built-in follow-up"), ["a", "built-in", "follow-up"]);
+        let (phonemes, _) = g2p.g2p("The disk is read-only.").unwrap();
+        assert!(phonemes.contains("ɹˈidˌOnli"), "{phonemes}");
+    }
+
+    #[test]
+    fn test_a_hyphenated_word_the_lexicon_lacks_is_split() {
+        let g2p = G2P::new(Language::EnglishUS);
+        assert_eq!(texts(&g2p, "foo-bar"), ["foo", "-", "bar"]);
+        assert_eq!(texts(&g2p, "read--only"), ["read", "--", "only"]);
+        // The longest known run wins; the rest splits as before.
+        assert_eq!(texts(&g2p, "built-in-ish"), ["built-in", "-", "ish"]);
     }
 
     // Tests for `[text](feature)` markdown-link parsing — see
