@@ -10,6 +10,9 @@ const LEXICON_ORDS: &[u32] = &[
     112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122,
 ];
 const US_TAUS: &str = "AIOWYiuæɑəɛɪɹʊʌ";
+// misaki's vowels, and the e and o that begin eSpeak's joined pairs, so a
+// stress mark goes before a pair, not inside it.
+const VOWELS: &str = "AIOQWYaiuæɑɒɔəɛɜɪʊʌᵻeo";
 
 fn get_add_symbols() -> HashMap<&'static str, &'static str> {
     let mut m = HashMap::new();
@@ -236,7 +239,7 @@ impl Lexicon {
     pub fn apply_stress(&self, ps: &str, stress: Option<f64>) -> String {
         let primary = 'ˈ';
         let secondary = 'ˌ';
-        let vowels = "AIOQWYaiuæɑɒɔəɛɜɪʊʌᵻ";
+        let vowels = VOWELS;
 
         if stress.is_none() {
             return ps.to_string();
@@ -271,7 +274,7 @@ impl Lexicon {
     fn restress(&self, ps: &str) -> String {
         let primary = 'ˈ';
         let secondary = 'ˌ';
-        let vowels = "AIOQWYaiuæɑɒɔəɛɜɪʊʌᵻ";
+        let vowels = VOWELS;
 
         let mut parts: Vec<(f64, char)> =
             ps.chars().enumerate().map(|(i, c)| (i as f64, c)).collect();
@@ -747,6 +750,19 @@ mod tests {
         };
         assert_eq!(say("JJ").as_deref(), Some("sˈɛpəɹət"));
         assert_eq!(say("VB").as_deref(), Some("sˈɛpəɹe\u{200d}ɪt"));
+    }
+
+    #[test]
+    fn a_stress_mark_goes_before_a_joined_pair() {
+        let lexicon = lexicon(&[]);
+        assert_eq!(
+            lexicon.apply_stress("ðe\u{200d}ɪ", Some(0.5)),
+            "ðˌe\u{200d}ɪ"
+        );
+        assert_eq!(
+            lexicon.apply_stress("wo\u{200d}ʊnt", Some(2.0)),
+            "wˈo\u{200d}ʊnt"
+        );
     }
 
     #[test]
