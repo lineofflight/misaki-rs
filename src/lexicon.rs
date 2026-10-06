@@ -738,6 +738,18 @@ mod tests {
     }
 
     #[test]
+    fn a_word_said_by_its_part_of_speech_keeps_misakis_readings() {
+        let lexicon = Lexicon::new(Language::EnglishGB);
+        let say = |tag| {
+            lexicon
+                .lookup("separate", tag, None, None)
+                .map(|(ps, _)| ps)
+        };
+        assert_eq!(say("JJ").as_deref(), Some("sˈɛpəɹət"));
+        assert_eq!(say("VB").as_deref(), Some("sˈɛpəɹe\u{200d}ɪt"));
+    }
+
+    #[test]
     fn the_table_holds_the_file_entries_and_nothing_more() {
         let lexicon = Lexicon::new(Language::EnglishUS);
         assert_eq!(lexicon.golds.len(), data::load_us_gold().len());

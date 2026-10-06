@@ -106,10 +106,12 @@ This is useful when you want a custom pronunciation source, a dictionary lookup,
 
 The original misaki project had very few words and some were not pronunced correctly. Here I updated the original pronunciation dict to include more words and correct pronunciations using eSpeak.
 
+eSpeak gives a word one reading, so a word said differently by part of speech, such as *present* or *separate*, keeps misaki's readings instead: every word whose entry the gold dictionaries of [hexgrad/misaki](https://github.com/hexgrad/misaki) key by tag, taken at commit `fba1236`, with misaki's one-letter diphthongs and affricates written as eSpeak's pairs. `scripts/import_upstream_tags.py` takes them again.
+
 ## Scope
 
 This repository aims to provide a lightweight and efficient alternative to ONNX-based phonemizers for Rust applications. It eliminates the need for external C++ dependencies or large model files by porting the logic and data into native Rust.
 
 ## License
 
-This project is based on the original Misaki library. See the original repository for licensing details regarding the underlying dictionary data.
+This project is based on the original Misaki library. See the original repository for licensing details regarding the underlying dictionary data. The part-of-speech readings in `data/*_gold.json` come from [hexgrad/misaki](https://github.com/hexgrad/misaki) under the [Apache License 2.0](https://github.com/hexgrad/misaki/blob/main/LICENSE), changed only in notation as described under Pronunciations.
