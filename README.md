@@ -33,7 +33,7 @@ To check that espeak fallback is working, phonemize an out-of-vocabulary word li
 cargo test test_ebook_with_espeak -- --nocapture
 ```
 
-You should see output like `eBook (with espeak): ˈi bˈʊk.` (word-like). Without the espeak feature, the same word is spelled out: `cargo test test_ebook_without_espeak --no-default-features -- --nocapture` gives e.g. `eBook (without espeak): ˈiː  bˈi  ˈo‍ʊ  ˈo‍ʊ  kˈe‍ɪ` (E, B, O, O, K as letter names).
+You should see output like `eBook (with espeak): ˈi bˈʊk.` (word-like). Without the espeak feature, the same word is spelled out: `cargo test test_ebook_without_espeak --no-default-features -- --nocapture` gives e.g. `eBook (without espeak): ˈi  bˈi  ˈo‍ʊ  ˈo‍ʊ  kˈe‍ɪ` (E, B, O, O, K as letter names).
 
 
 ## Installation
@@ -104,7 +104,12 @@ This is useful when you want a custom pronunciation source, a dictionary lookup,
 
 ## Pronunciations
 
-The original misaki project had very few words and some were not pronunced correctly. Here I updated the original pronunciation dict to include more words and correct pronunciations using eSpeak.
+The dictionaries in `data/` are a hybrid of two sources:
+
+- Every word [hexgrad/misaki](https://github.com/hexgrad/misaki) has, about 197,000 British and 184,000 American, takes misaki's entry and tier, gold or silver, as at commit `e820629`. A word said differently by part of speech, such as *present* or *separate*, keeps a reading for each. Only the notation changes: misaki's one-letter diphthongs and affricates (`A`, `I`, `O`, `Q`, `W`, `Y`, `ʤ`, `ʧ`) are written as pairs joined by U+200D (`e‍ɪ`, `a‍ɪ`, `o‍ʊ`, `ə‍ʊ`, `a‍ʊ`, `ɔ‍ɪ`, `d‍ʒ`, `t‍ʃ`).
+- Every word misaki lacks, about 194,000 British and 206,000 American, keeps the entry `expand_dicts.py` generated for it with eSpeak-ng.
+
+`scripts/build_hybrid_dictionary.py` builds `data/` again from both.
 
 ## Scope
 
@@ -112,4 +117,4 @@ This repository aims to provide a lightweight and efficient alternative to ONNX-
 
 ## License
 
-This project is based on the original Misaki library. See the original repository for licensing details regarding the underlying dictionary data.
+This project is based on the original Misaki library. The entries in `data/` for words misaki has come from [hexgrad/misaki](https://github.com/hexgrad/misaki) under the [Apache License 2.0](https://github.com/hexgrad/misaki/blob/main/LICENSE), changed only in notation as described under Pronunciations. The entries for words it lacks were generated with eSpeak-ng.

@@ -575,8 +575,8 @@ mod tests {
         let noun = G2P::with_tagger(Language::EnglishUS, Box::new(TestTagger("NN")));
         let verb = G2P::with_tagger(Language::EnglishUS, Box::new(TestTagger("VB")));
 
-        assert_eq!(first_phonemes(&noun, "preload"), "pɹˈilˌOd");
-        assert_eq!(first_phonemes(&verb, "preload"), "pɹilˈOd");
+        assert_eq!(first_phonemes(&noun, "preload"), "pɹˈilˌo\u{200d}ʊd");
+        assert_eq!(first_phonemes(&verb, "preload"), "pɹilˈo\u{200d}ʊd");
     }
 
     #[test]
@@ -600,7 +600,7 @@ mod tests {
     fn test_set_tagger_keeps_the_fallback() {
         let mut g2p = G2P::with_fallback(Language::EnglishUS, Some(Box::new(TestFallback)));
         g2p.set_tagger(Box::new(TestTagger("NN")));
-        assert_eq!(first_phonemes(&g2p, "preload"), "pɹˈilˌOd");
+        assert_eq!(first_phonemes(&g2p, "preload"), "pɹˈilˌo\u{200d}ʊd");
         assert_eq!(first_phonemes(&g2p, "qzxwv"), "test-phonemes");
     }
 
@@ -635,7 +635,7 @@ mod tests {
         assert_eq!(texts(&g2p, "read-only."), ["read-only", "."]);
         assert_eq!(texts(&g2p, "a built-in follow-up"), ["a", "built-in", "follow-up"]);
         let (phonemes, _) = g2p.g2p("The disk is read-only.").unwrap();
-        assert!(phonemes.contains("ɹˈidˌOnli"), "{phonemes}");
+        assert!(phonemes.contains("ɹˈidˌo\u{200d}ʊnli"), "{phonemes}");
     }
 
     #[test]

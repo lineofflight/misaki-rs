@@ -740,6 +740,100 @@ mod tests {
         assert_eq!(ps, "tˈɑːməl");
     }
 
+    fn said(lang: Language, word: &str, tag: &str) -> Option<String> {
+        Lexicon::new(lang)
+            .lookup(word, tag, None, None)
+            .map(|(ps, _)| ps)
+    }
+
+    #[test]
+    fn a_word_misaki_has_takes_its_entry_in_joined_pairs() {
+        // misaki's ˈIðə and skˈɛʤˌul; eSpeak had ˈa‍ɪðəɹ and skˈɛd‍ʒuːl.
+        assert_eq!(
+            said(Language::EnglishGB, "either", "CC").as_deref(),
+            Some("ˈa\u{200d}ɪðə")
+        );
+        assert_eq!(
+            said(Language::EnglishUS, "schedule", "NN").as_deref(),
+            Some("skˈɛd\u{200d}ʒˌul")
+        );
+    }
+
+    #[test]
+    fn a_word_misaki_lacks_keeps_its_espeak_entry() {
+        assert_eq!(
+            said(Language::EnglishUS, "aalii", "NN").as_deref(),
+            Some("ˈɑːlɪˌa\u{200d}ɪ")
+        );
+    }
+
+    #[test]
+    fn a_word_said_by_its_part_of_speech_keeps_misakis_readings() {
+        assert_eq!(
+            said(Language::EnglishGB, "separate", "JJ").as_deref(),
+            Some("sˈɛpəɹət")
+        );
+        assert_eq!(
+            said(Language::EnglishGB, "separate", "VB").as_deref(),
+            Some("sˈɛpəɹe\u{200d}ɪt")
+        );
+    }
+
+    // A Penn Treebank tag that reaches each key misaki's maps use.
+    fn tag_for(key: &str) -> &str {
+        match key {
+            "NOUN" => "NN",
+            "VERB" => "VB",
+            "ADJ" => "JJ",
+            "ADV" => "RB",
+            "DEFAULT" => "UH",
+            tag => tag,
+        }
+    }
+
+    #[test]
+    fn every_tag_a_map_uses_reaches_its_reading() {
+        for lang in [Language::EnglishGB, Language::EnglishUS] {
+            let lexicon = Lexicon::new(lang);
+            let mut maps = 0;
+            for (word, entry) in &lexicon.golds {
+                let PhonemeEntry::Tagged(map) = entry else {
+                    continue;
+                };
+                maps += 1;
+                for (key, ps) in map {
+                    // A null reading, NOUN for US or IT, is one Python
+                    // spells out; here the word takes DEFAULT.
+                    let Some(ps) = ps else { continue };
+                    // "None" is the reading for a word nothing follows.
+                    let ctx = TokenContext {
+                        future_vowel: (key != "None").then_some(false),
+                        future_to: false,
+                    };
+                    let said = lexicon.lookup(word, tag_for(key), None, Some(&ctx));
+                    assert_eq!(said.map(|(ps, _)| ps).as_ref(), Some(ps), "{word} as {key}");
+                }
+            }
+            assert!(maps > 700, "{maps} maps");
+        }
+    }
+
+    #[test]
+    fn no_entry_is_left_in_misakis_one_letter_notation() {
+        for lang in [Language::EnglishGB, Language::EnglishUS] {
+            let lexicon = Lexicon::new(lang);
+            for (word, entry) in lexicon.golds.iter().chain(&lexicon.silvers) {
+                let readings: Vec<&String> = match entry {
+                    PhonemeEntry::Simple(ps) => vec![ps],
+                    PhonemeEntry::Tagged(map) => map.values().flatten().collect(),
+                };
+                for ps in readings {
+                    assert!(!ps.contains(|c| "AIOQWYʤʧ".contains(c)), "{word}: {ps}");
+                }
+            }
+        }
+    }
+
     #[test]
     fn a_stress_mark_goes_before_a_joined_pair() {
         let lexicon = lexicon(&[]);
