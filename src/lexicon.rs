@@ -448,7 +448,9 @@ impl Lexicon {
             lower[..lower.len() - 3].to_string() + "e"
         } else if lower.len() > 5 {
             // Python regex: r'([bcdgklmnprstvxz])\1ing$|cking$'
-            let stem_candidate = &lower[..lower.len() - 4];
+            // The letter it drops with "ing" is ASCII, one byte. A word with a wider letter
+            // there, like "sautéing", cannot match and is not stemmed.
+            let stem_candidate = lower.get(..lower.len() - 4)?;
             if self.is_known(stem_candidate, tag) {
                 // Check for doubled consonants or 'ck'
                 let chars: Vec<char> = stem_candidate.chars().collect();
@@ -845,6 +847,23 @@ mod tests {
             lexicon.apply_stress("wo\u{200d}ʊnt", Some(2.0)),
             "wˈo\u{200d}ʊnt"
         );
+    }
+
+    #[test]
+    fn a_letter_outside_ascii_before_ing_leaves_the_word_unstemmed() {
+        let lexicon = lexicon(&[]);
+        for word in ["sautéing", "Böing", "学习ing"] {
+            assert_eq!(lexicon.get_word(word, "VBG", None, None), None, "{word}");
+        }
+    }
+
+    #[test]
+    fn a_stem_ending_outside_ascii_still_takes_ing_when_the_lexicon_holds_it() {
+        let lexicon = lexicon(&[("sauté", "sɔtˈA")]);
+        let (ps, _) = lexicon
+            .get_word("sautéing", "VBG", None, None)
+            .expect("a known stem");
+        assert_eq!(ps, "sɔtˈAɪŋ");
     }
 
     #[test]
