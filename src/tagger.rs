@@ -42,6 +42,12 @@ impl AveragedPerceptron {
     }
 }
 
+/// Trait for part-of-speech taggers
+pub trait Tagger: Send + Sync {
+    /// Tag each word with its Penn Treebank tag, one tag per word, in order
+    fn tag(&self, words: &[&str]) -> Vec<String>;
+}
+
 pub struct Tag<'a> {
     pub word: &'a str,
     pub tag: String,
@@ -51,6 +57,12 @@ pub struct Tag<'a> {
 pub struct PerceptronTagger {
     model: AveragedPerceptron,
     tags: HashMap<String, String>,
+}
+
+impl Tagger for PerceptronTagger {
+    fn tag(&self, words: &[&str]) -> Vec<String> {
+        PerceptronTagger::tag(self, words).into_iter().map(|t| t.tag).collect()
+    }
 }
 
 impl PerceptronTagger {
